@@ -26,3 +26,6 @@ class ProductCreate(BaseModel):
 class ProductResponse(ProductCreate):
     id: int
     user_id: int
+
+class ErrorResponse(BaseModel):
+    error: str

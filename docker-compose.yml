@@ -17,7 +17,7 @@ services:
     build: .
     command: ["pytest"]
     depends_on:
-      - db  
+      - db
   db:
     image: postgres:latest
     ports:
@@ -30,5 +30,3 @@ services:
       - db_data:/var/lib/postgresql/data
 volumes:
   db_data:
-
-

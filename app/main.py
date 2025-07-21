@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends
-from app.database import get_db 
+from app.database import get_db
 from app.schemas.schema import UserCreate,UserResponse, ProductCreate, ProductResponse
 from sqlalchemy.orm import Session
 from app.models.models import User, Product
 from app.redis_cache import r
 from fastapi.encoders import jsonable_encoder
+from typing import Optional
 import json
 app = FastAPI()
 
@@ -34,33 +35,130 @@ def add_product(product: ProductCreate, db: Session = Depends(get_db)):
     r.delete('products')
     return new_product
 
-# Get all users
+# Get all users with filters
+from typing import Optional
+
 @app.get('/users', response_model=list[UserResponse])
-def get_users(db: Session = Depends(get_db)):
-    cache= r.get('users')
-    # Check if users are cached
+def get_users(
+    name: Optional[str] = None,
+    email: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    cache_key = f'users:{name}:{email}'
+    cache = r.get(cache_key)
+
     if cache:
-        print('Serving from cache')
+        print('Serving filtered users from cache')
         return json.loads(cache)
-    # If not cached, fetch from database
-    print('Serving from database')
-    users = db.query(User).all()
-    cached_users = jsonable_encoder(users)
-    r.set('users', json.dumps(cached_users), ex=60)  # Cache for 10 seconds
+
+    print('Serving filtered users from database')
+    query = db.query(User)
+    if name:
+        query = query.filter(User.name.ilike(f'%{name}%'))  # case-insensitive
+    if email:
+        query = query.filter(User.email.ilike(f'%{email}%'))
+
+    users = query.all()
+    result = jsonable_encoder(users)
+    r.set(cache_key, json.dumps(result), ex=60)
     return users
 
-# Get all products
-@app.get('/products', response_model=list[ProductResponse])
-def get_products(db: Session = Depends(get_db)):
-    cache = r.get('products')
 
-    # Check if products are cached
+# Get all products with filtering 
+@app.get('/products', response_model=list[ProductResponse])
+def get_products(
+    name: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    db: Session = Depends(get_db)
+):
+    cache_key = f'products:{name}:{min_price}:{max_price}'
+    cache = r.get(cache_key)
+
     if cache:
-        print("Serving from cache")
+        print("Serving filtered products from cache")
         return json.loads(cache)
-    # If not cached, fetch from database
-    print("Serving from database")
-    products = db.query(Product).all()
-    cached_products = jsonable_encoder(products)
-    r.set('products', json.dumps(cached_products), ex=60)
+
+    print("Serving filtered products from database")
+    query = db.query(Product)
+
+    if name:
+        query = query.filter(Product.name.ilike(f'%{name}%'))
+    if min_price is not None:
+        query = query.filter(Product.price >= min_price)
+    if max_price is not None:
+        query = query.filter(Product.price <= max_price)
+
+    products = query.all()
+    result = jsonable_encoder(products)
+    r.set(cache_key, json.dumps(result), ex=60)
     return products
+
+
+
+@app.get('/user/{user_id}', response_model=UserResponse)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return {"error": "User not found"}
+    return user
+
+
+@app.get('/product/{product_id}', response_model=ProductResponse)
+def get_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    return product
+
+
+
+@app.delete('/user/{user_id}', response_model=dict)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return {"error": "User not found"}
+    db.delete(user)
+    db.commit()
+    r.delete('users')
+    return {"message": f"User {user_id} deleted successfully"}
+
+
+@app.delete('/product/{product_id}', response_model=dict)
+def delete_product(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    db.delete(product)
+    db.commit()
+    r.delete('products')
+    return {"message": f"Product {product_id} deleted successfully"}
+
+
+
+@app.put('/user/{user_id}', response_model=UserResponse)
+def update_user(user_id: int, user_data: UserCreate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return {"error": "User not found"}
+    user.name = user_data.name
+    user.email = user_data.email
+    db.commit()
+    db.refresh(user)
+    r.delete('users')
+    return user
+
+
+@app.put('/product/{product_id}', response_model=ProductResponse)
+def update_product(product_id: int, product_data: ProductCreate, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return {"error": "Product not found"}
+    product.name = product_data.name
+    product.description = product_data.description
+    product.price = product_data.price
+    product.user_id = product_data.user_id
+    db.commit()
+    db.refresh(product)
+    r.delete('products')
+    return product
