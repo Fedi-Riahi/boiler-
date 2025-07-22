@@ -6,6 +6,8 @@ from app.models.models import User, Product
 from app.redis_cache import r
 from fastapi.encoders import jsonable_encoder
 from typing import Optional
+from app.search.es_client import es
+from typing import Optional
 import json
 app = FastAPI()
 
@@ -33,10 +35,17 @@ def add_product(product: ProductCreate, db: Session = Depends(get_db)):
     db.refresh(new_product)
 
     r.delete('products')
+
+    # Index the product in Elasticsearch
+    es.index(index='products', id=new_product.id, document={
+        'name': new_product.name,
+        'description': new_product.description,
+        'price': new_product.price,
+        'user_id': new_product.user_id
+    })
     return new_product
 
-# Get all users with filters
-from typing import Optional
+
 
 @app.get('/users', response_model=list[UserResponse])
 def get_users(
@@ -54,7 +63,8 @@ def get_users(
     print('Serving filtered users from database')
     query = db.query(User)
     if name:
-        query = query.filter(User.name.ilike(f'%{name}%'))  # case-insensitive
+        query = query.filter(User.name.
+        ilike(f'%{name}%'))  # case-insensitive
     if email:
         query = query.filter(User.email.ilike(f'%{email}%'))
 
