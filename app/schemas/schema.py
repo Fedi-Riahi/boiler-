@@ -6,9 +6,9 @@ class UserCreate(BaseModel):
     id: int
     name: str
     email: str
-    class ConfigDict:
+    class Config:
         from_attributes = True
-
+    
 class UserResponse(UserCreate):
     id: int
 # Product schemas for request and response models
@@ -20,7 +20,7 @@ class ProductCreate(BaseModel):
     price: int
     user_id: int
 
-    class ConfigDict:
+    class Config:
         from_attributes = True
 
 class ProductResponse(ProductCreate):

@@ -1,11 +1,15 @@
 from elasticsearch import Elasticsearch
+import os
 
-es = Elasticsearch('http://boiler-elasticsearch-1:9200') # http://boiler-elasticsearch-1:9200 - Docker
+es_host = os.getenv("ELASTICSEARCH_HOST", "elasticsearch")
+es_port = os.getenv("ELASTICSEARCH_PORT", "9200")
 
-version_info = es.info()
-print(version_info['version']['number']) 
+es_url = f"http://{es_host}:{es_port}"
+es = Elasticsearch(es_url)
 
-if not es.ping():
-    print("Connection to Elasticsearch failed")
-else:
-    print("Connected to Elasticsearch")
+def get_es_info():
+    try:
+        return es.info()
+    except Exception as e:
+        print(f"Elasticsearch not available: {e}")
+        return None

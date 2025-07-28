@@ -20,7 +20,7 @@ def test_get_products():
 
 def test_add_user():
     user_data = {
-        "id": 136,
+        "id": 141,
         "name": "Test User",
         "email": "testuser@example.com"
     }
@@ -32,8 +32,8 @@ def test_add_user():
 
 def test_add_product():
     product_data = {
-        "id": 136,
-        "user_id": 29,
+        "id": 141,
+        "user_id": 141,
         "name": "Test Product",
         "description": "This is a test product",
         "price": 100
@@ -51,23 +51,23 @@ def test_search_users():
     assert all('Test' in user['name'] for user in users)
 
 def test_search_products():
-    response = client.get('/products?min_price=50&max_price=150')
+    response = client.get('/products?min_price=0&max_price=150')
     assert response.status_code == 200
     products = response.json()
     assert all(50 <= product['price'] <= 150 for product in products)
 
 def test_get_user_by_id():
-    response = client.get('/user/11')
+    response = client.get('/user/141')
     assert response.status_code == 200
     assert response.json()['id'] == 29
 
 def test_get_user_not_found():
-    response = client.get('/user/8000')
+    response = client.get('/user/5')
     assert response.status_code == 200
     assert "error" in response.json()
 
 def test_delete_user():
-    response = client.delete('/user/11')
+    response = client.delete('/user/141')
     assert response.status_code == 200
     assert "deleted successfully" in response.json()['message']
 
@@ -78,10 +78,10 @@ def test_delete_user_not_found():
 
 def test_update_user():
     # Add user first
-    user_data = {"id": 39, "name": "Original Name", "email": "orig@example.com"}
+    user_data = {"id": 141, "name": "Original Name", "email": "orig@example.com"}
     client.post('/add-user', json=user_data)
 
-    updated_data = {"id": 39, "name": "Updated Name", "email": "updated@example.com"}
+    updated_data = {"id": 141, "name": "Updated Name", "email": "updated@example.com"}
     response = client.put('/user/30', json=updated_data)
     assert response.status_code == 200
     data = response.json()

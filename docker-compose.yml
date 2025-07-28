@@ -1,39 +1,65 @@
+version: '3.9'
+
 services:
   web:
     build: .
+    container_name: web
     ports:
       - "8000:8000"
     depends_on:
-      - redis
-      - db
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
     environment:
       - REDIS_HOST=redis
       - DB_HOST=db
+      - DATABASE_URL=postgresql://postgres:Riahi123654@db:5432/postgres
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+
   redis:
     image: redis:latest
+    container_name: redis
     ports:
       - "6379:6379"
+
   test:
     build: .
+    container_name: test
     command: ["pytest"]
     depends_on:
       - db
+    environment:
+      - DATABASE_URL=postgresql://postgres:Riahi123654@db:5432/postgres
+
   db:
     image: postgres:latest
+    container_name: db
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Riahi123654
-      POSTGRES_DB: postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Riahi123654
+      - POSTGRES_DB=postgres
     volumes:
       - db_data:/var/lib/postgresql/data
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    container_name: elasticsearch
     ports:
       - "9200:9200"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   db_data:
